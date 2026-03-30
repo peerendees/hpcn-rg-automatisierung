@@ -7,16 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify-quellen": "tsx scripts/verify-quellen.ts"
+    "verify-quellen": "tsx scripts/verify-quellen.ts",
+    "build:template": "node scripts/build-invoice-template.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^143.0.4",
     "date-fns": "^4.1.0",
-    "docx": "^9.6.1",
+    "docxtemplater": "^3.68.3",
     "jszip": "^3.10.1",
     "mammoth": "^1.12.0",
     "next": "16.2.1",
     "papaparse": "^5.5.3",
+    "pizzip": "^3.2.0",
     "puppeteer-core": "^24.40.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"

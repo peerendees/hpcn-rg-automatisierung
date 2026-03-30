@@ -1,23 +1,27 @@
 import { InvoiceForm } from "@/components/InvoiceForm";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Home() {
   return (
     <div className="relative z-10 flex min-h-full flex-1 flex-col px-4 py-8 sm:px-8 sm:py-12">
       <header className="mx-auto mb-10 w-full max-w-3xl border-b border-[var(--border)] pb-8">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="plus-mark mt-1 shrink-0" aria-hidden />
-          <div>
-            <p className="font-[family-name:var(--font-display)] text-3xl tracking-[0.1em] text-[var(--gold)] sm:text-4xl">
-              RG-FORM
-            </p>
-            <h1 className="mt-1 font-[family-name:var(--font-display)] text-2xl tracking-[0.06em] text-[var(--text)] sm:text-3xl">
-              RECHNUNGSAUTOMATISIERUNG
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--muted)]">
-              CSV aus der Zeiterfassung einlesen, Positionen und Summen prüfen,
-              Rechnung als DOCX oder PDF exportieren — Prototyp hpcn.
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="plus-mark mt-1 shrink-0" aria-hidden />
+            <div>
+              <p className="font-[family-name:var(--font-display)] text-3xl tracking-[0.1em] text-[var(--gold)] sm:text-4xl">
+                RG-FORM
+              </p>
+              <h1 className="mt-1 font-[family-name:var(--font-display)] text-2xl tracking-[0.06em] text-[var(--text)] sm:text-3xl">
+                RECHNUNGSAUTOMATISIERUNG
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--muted)]">
+                CSV aus der Zeiterfassung einlesen, Positionen und Summen prüfen,
+                Rechnung als DOCX oder PDF exportieren — Prototyp hpcn.
+              </p>
+            </div>
           </div>
+          <ThemeToggle />
         </div>
       </header>
 

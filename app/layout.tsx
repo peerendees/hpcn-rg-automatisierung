@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, JetBrains_Mono, Lora } from "next/font/google";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 const display = Bebas_Neue({
@@ -33,12 +34,14 @@ export default function RootLayout({
   return (
     <html
       lang="de"
+      data-theme="dark"
+      suppressHydrationWarning
       className={`${display.variable} ${body.variable} ${mono.variable} h-full`}
     >
       <body
-        className={`${body.className} min-h-full flex flex-col bg-[var(--bg)] text-[var(--text)] antialiased`}
+        className={`${body.className} min-h-full flex flex-col bg-[var(--bg)] text-[var(--text)] antialiased transition-colors duration-300`}
       >
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
     "@sparticuz/chromium",
     "puppeteer-core",
     "mammoth",
+    "docxtemplater",
+    "pizzip",
   ],
 };
 

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-:root {
+:root,
+[data-theme="dark"] {
   --background: #090806;
   --foreground: #c4bcb1;
   --bg: #090806;
@@ -10,6 +11,19 @@
   --gold: #e8c98a;
   --text: #c4bcb1;
   --muted: #7a6a58;
+}
+
+/* Hellmodus — angelehnt an berent.ai / BERENT Light */
+[data-theme="light"] {
+  --background: #f5f2ee;
+  --foreground: #2e2318;
+  --bg: #f5f2ee;
+  --card: #edeae4;
+  --border: #d1cbbd;
+  --copper: #9a6320;
+  --gold: #9a6320;
+  --text: #2e2318;
+  --muted: #7a6248;
 }
 
 @theme inline {
@@ -53,6 +67,18 @@ body::after {
   );
   pointer-events: none;
   z-index: 0;
+}
+
+[data-theme="light"] body::before {
+  opacity: 0.02;
+}
+
+[data-theme="light"] body::after {
+  background: radial-gradient(
+    circle,
+    rgba(154, 99, 32, 0.06) 0%,
+    transparent 68%
+  );
 }
 
 .plus-mark {
