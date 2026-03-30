@@ -1,0 +1,10 @@
+type;category;project;task;subtask;unix_start;unix_end;start;end;date;start_time;end_time;duration;distance;quantity;rate;sum;rounding_minutes;rounding_method;billing;note;user
+timed;Kunde;Intern;Verwaltung;;1763357400;1763375400;2025-11-17T06:30:00+01:00;2025-11-17T11:30:00+01:00;17.11.25;06:30;11:30;300;0;0;60;300;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763377200;1763388000;2025-11-17T12:00:00+01:00;2025-11-17T15:00:00+01:00;17.11.25;12:00;15:00;180;0;0;60;180;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763445600;1763461800;2025-11-18T07:00:00+01:00;2025-11-18T11:30:00+01:00;18.11.25;07:00;11:30;270;0;0;60;270;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763463600;1763474400;2025-11-18T12:00:00+01:00;2025-11-18T15:00:00+01:00;18.11.25;12:00;15:00;180;0;0;60;180;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763479800;1763481600;2025-11-18T16:30:00+01:00;2025-11-18T17:00:00+01:00;18.11.25;16:30;17:00;30;0;0;60;30;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763530200;1763548200;2025-11-19T06:30:00+01:00;2025-11-19T11:30:00+01:00;19.11.25;06:30;11:30;300;0;0;60;300;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763550000;1763560800;2025-11-19T12:00:00+01:00;2025-11-19T15:00:00+01:00;19.11.25;12:00;15:00;180;0;0;60;180;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763703000;1763721000;2025-11-21T06:30:00+01:00;2025-11-21T11:30:00+01:00;21.11.25;06:30;11:30;300;0;0;60;300;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763722800;1763733600;2025-11-21T12:00:00+01:00;2025-11-21T15:00:00+01:00;21.11.25;12:00;15:00;180;0;0;60;180;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;

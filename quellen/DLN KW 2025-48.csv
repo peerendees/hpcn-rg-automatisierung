@@ -1,0 +1,7 @@
+type;category;project;task;subtask;unix_start;unix_end;start;end;date;start_time;end_time;duration;distance;quantity;rate;sum;rounding_minutes;rounding_method;billing;note;user
+timed;Kunde;Intern;Verwaltung;;1763962200;1763980200;2025-11-24T06:30:00+01:00;2025-11-24T11:30:00+01:00;24.11.25;06:30;11:30;300;0;0;60;300;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1763982000;1763992800;2025-11-24T12:00:00+01:00;2025-11-24T15:00:00+01:00;24.11.25;12:00;15:00;180;0;0;60;180;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1764050400;1764070200;2025-11-25T07:00:00+01:00;2025-11-25T12:30:00+01:00;25.11.25;07:00;12:30;330;0;0;60;330;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1764232200;1764241200;2025-11-27T09:30:00+01:00;2025-11-27T12:00:00+01:00;27.11.25;09:30;12:00;150;0;0;60;150;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1764309600;1764327600;2025-11-28T07:00:00+01:00;2025-11-28T12:00:00+01:00;28.11.25;07:00;12:00;300;0;0;60;300;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
+timed;Kunde;Intern;Verwaltung;;1764329400;1764340200;2025-11-28T12:30:00+01:00;2025-11-28T15:30:00+01:00;28.11.25;12:30;15:30;180;0;0;60;180;15;NEAREST;UNBILLED;Abarbeitung Anliegen per E-Mail und weitere Anliegen;
