@@ -25,6 +25,9 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "RG-Form · Rechnungsautomatisierung",
   description: "CSV aus Zeiterfassung zu Rechnung (hpcn)",
+  icons: {
+    icon: [{ url: "/berent-favicon.webp", type: "image/webp" }],
+  },
 };
 
 export default function RootLayout({

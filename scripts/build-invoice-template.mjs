@@ -15,11 +15,26 @@ const src = path.join(root, "quellen", "Vorlage-HPCN-Rechnung.docx");
 const outDir = path.join(root, "assets", "templates");
 const outFile = path.join(outDir, "invoice-template.docx");
 
+/** Echtes Zeilen-Tag <w:tr> / <w:tr …>, nicht <w:trPr> (lastIndexOf("<w:tr",…) würde trPr treffen). */
+function lastWTrOpen(xml, beforeIndex) {
+  let pos = beforeIndex;
+  while (true) {
+    const idx = xml.lastIndexOf("<w:tr", pos);
+    if (idx === -1) return -1;
+    if (xml.startsWith("<w:trPr", idx)) {
+      pos = idx - 1;
+      continue;
+    }
+    return idx;
+  }
+}
+
 function patchDataRow(xml) {
   const marker = "<w:t>01</w:t>";
   const i = xml.indexOf(marker);
   if (i === -1) throw new Error("Positionszeile mit 01 nicht gefunden.");
-  const trStart = xml.lastIndexOf("<w:tr", i);
+  const trStart = lastWTrOpen(xml, i);
+  if (trStart === -1) throw new Error("<w:tr> vor Positionszeile 01 nicht gefunden.");
   const trEnd = xml.indexOf("</w:tr>", i) + "</w:tr>".length;
   let row = xml.slice(trStart, trEnd);
 
@@ -55,7 +70,8 @@ function patchDataRow(xml) {
 function removeSecondDataRow(xml) {
   const i02 = xml.indexOf("<w:t>02</w:t>");
   if (i02 === -1) throw new Error("Zweite Positionszeile (02) nicht gefunden.");
-  const trStart = xml.lastIndexOf("<w:tr", i02);
+  const trStart = lastWTrOpen(xml, i02);
+  if (trStart === -1) throw new Error("<w:tr> vor Positionszeile 02 nicht gefunden.");
   const trEnd = xml.indexOf("</w:tr>", i02) + "</w:tr>".length;
   return xml.slice(0, trStart) + xml.slice(trEnd);
 }
