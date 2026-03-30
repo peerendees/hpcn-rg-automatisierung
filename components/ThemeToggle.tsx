@@ -10,14 +10,14 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--card)]/80 text-[var(--gold)] shadow-sm transition hover:border-[var(--copper)]/50 hover:bg-[var(--card)]"
-      aria-label={isDark ? "Zum Hellmodus wechseln" : "Zum Dunkelmodus wechseln"}
+      className="theme-toggle"
+      aria-label="Farbschema wechseln"
       title={isDark ? "Hellmodus" : "Dunkelmodus"}
     >
       {isDark ? (
-        <SunIcon className="h-5 w-5" aria-hidden />
+        <SunIcon className="h-4 w-4" aria-hidden />
       ) : (
-        <MoonIcon className="h-5 w-5" aria-hidden />
+        <MoonIcon className="h-4 w-4" aria-hidden />
       )}
     </button>
   );

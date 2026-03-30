@@ -8,7 +8,7 @@ import { parseCsv } from "../lib/csv-parser";
 
 const root = process.cwd();
 const files = [
-  "quellen/DLN KW 2025-47 .csv",
+  "quellen/DLN KW 2025-47.csv",
   "quellen/DLN KW 2025-48.csv",
 ];
 

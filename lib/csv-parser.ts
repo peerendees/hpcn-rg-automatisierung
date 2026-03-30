@@ -1,10 +1,41 @@
 import Papa from "papaparse";
 import { getISOWeek, getISOWeekYear } from "date-fns";
 import type { InvoicePosition } from "@/types/invoice";
-
-const RATE_FALLBACK = 70;
+import { invoiceTemplate } from "@/lib/invoice-template";
 
 type Row = Record<string, string>;
+
+/** BOM / Whitespace am Anfang; Zeilenenden vereinheitlichen (Upload von macOS/Windows). */
+function normalizeCsvText(content: string): string {
+  return content
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
+}
+
+/** Excel/Export: erste Spalte heißt ggf. "\ufefftype" statt "type". */
+function normalizeRowKeys(row: Row): Row {
+  const o: Row = {};
+  for (const [k, v] of Object.entries(row)) {
+    const key = k.replace(/^\uFEFF/, "").trim();
+    o[key] = v == null ? "" : String(v);
+  }
+  return o;
+}
+
+function rowHasAnyValue(row: Row): boolean {
+  return Object.values(row).some((v) => String(v).trim() !== "");
+}
+
+function getCell(row: Row, ...names: string[]): string {
+  const keys = Object.keys(row);
+  for (const name of names) {
+    const hit = keys.find((k) => k.toLowerCase() === name.toLowerCase());
+    if (hit !== undefined) return (row[hit] ?? "").trim();
+  }
+  return "";
+}
 
 /** Summiert duration-Werte zu Stunden (CSV: Minuten, HH:MM:SS oder Dezimal-Stunden). */
 function parseDurationCell(raw: string, fileUsesMinutes: boolean): number {
@@ -26,11 +57,10 @@ function parseDurationCell(raw: string, fileUsesMinutes: boolean): number {
   return n;
 }
 
-/** Erkennt, ob numerische Durations in Minuten vorliegen (Export wie hpcn-Zeiterfassung). */
 function detectMinuteBased(rows: Row[], durationKey: string): boolean {
   const nums: number[] = [];
   for (const row of rows) {
-    const raw = row[durationKey]?.trim() ?? "";
+    const raw = getCell(row, durationKey);
     if (!raw || raw.includes(":")) continue;
     const n = parseFloat(raw.replace(",", "."));
     if (!Number.isNaN(n)) nums.push(n);
@@ -71,31 +101,55 @@ export function buildPositionText(
   return `KW${kw}: ${dayStrings.join(", ")}: = ${hoursFormatted} Std.`;
 }
 
+function parsePapa(text: string, delimiter: string | undefined): Papa.ParseResult<Row> {
+  return Papa.parse<Row>(text, {
+    header: true,
+    delimiter: delimiter ?? "",
+    skipEmptyLines: true,
+  });
+}
+
+function extractDataRows(parsed: Papa.ParseResult<Row>): Row[] {
+  const raw = parsed.data.map(normalizeRowKeys);
+  return raw.filter(rowHasAnyValue);
+}
+
 /**
  * Parst semikolon-separiertes CSV (Zeiterfassung) zu einer Rechnungsposition.
  */
 export function parseCsv(content: string): InvoicePosition {
-  const parsed = Papa.parse<Row>(content, {
-    header: true,
-    delimiter: ";",
-    skipEmptyLines: true,
-  });
+  const text = normalizeCsvText(content);
+  if (!text) {
+    throw new Error("CSV-Datei ist leer.");
+  }
 
+  let parsed = parsePapa(text, ";");
   if (parsed.errors.length > 0) {
     const msg = parsed.errors.map((e) => e.message).join("; ");
     throw new Error(`CSV-Parse-Fehler: ${msg}`);
   }
 
-  const rows = parsed.data.filter((r) =>
-    Object.values(r).some((v) => String(v).trim() !== ""),
-  );
+  let rows = extractDataRows(parsed);
+
+  // Fallback: Auto-Delimiter (z. B. anderes Trennzeichen oder BOM-Probleme)
   if (rows.length === 0) {
-    throw new Error("CSV enthält keine Datenzeilen.");
+    parsed = parsePapa(text, undefined);
+    if (parsed.errors.length > 0) {
+      const msg = parsed.errors.map((e) => e.message).join("; ");
+      throw new Error(`CSV-Parse-Fehler: ${msg}`);
+    }
+    rows = extractDataRows(parsed);
+  }
+
+  if (rows.length === 0) {
+    const preview = text.slice(0, 120).replace(/\n/g, "\\n");
+    throw new Error(
+      `CSV enthält keine Datenzeilen (nach Header). Vorschau: ${preview}${text.length > 120 ? "…" : ""}`,
+    );
   }
 
   const durationKey = "duration";
   const dateKey = "date";
-  const rateKey = "rate";
 
   const fileUsesMinutes = detectMinuteBased(rows, durationKey);
 
@@ -103,8 +157,11 @@ export function parseCsv(content: string): InvoicePosition {
   const dateSet = new Map<number, Date>();
 
   for (const row of rows) {
-    totalHours += parseDurationCell(row[durationKey] ?? "", fileUsesMinutes);
-    const ds = row[dateKey]?.trim() ?? "";
+    totalHours += parseDurationCell(
+      getCell(row, durationKey),
+      fileUsesMinutes,
+    );
+    const ds = getCell(row, dateKey);
     const d = parseGermanDateStr(ds);
     if (d) dateSet.set(d.getTime(), d);
   }
@@ -113,16 +170,16 @@ export function parseCsv(content: string): InvoicePosition {
     (a, b) => a.getTime() - b.getTime(),
   );
   if (uniqueDates.length === 0) {
-    throw new Error("Keine gültigen Datumsangaben in der Spalte date.");
+    throw new Error(
+      "Keine gültigen Datumsangaben in der Spalte date (Format TT.MM.JJ).",
+    );
   }
 
   const anchor = uniqueDates[0]!;
   const kw = getISOWeek(anchor);
   const year = getISOWeekYear(anchor);
 
-  const rateRaw = rows[0]?.[rateKey]?.trim();
-  const rateParsed = rateRaw ? parseFloat(rateRaw.replace(",", ".")) : NaN;
-  const rate = Number.isFinite(rateParsed) ? rateParsed : RATE_FALLBACK;
+  const rate = invoiceTemplate.prototypeHourlyRate;
 
   const positionText = buildPositionText(kw, uniqueDates, totalHours);
 

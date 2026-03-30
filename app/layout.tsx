@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, JetBrains_Mono, Lora } from "next/font/google";
+import { SiteNav } from "@/components/SiteNav";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
@@ -41,7 +42,10 @@ export default function RootLayout({
       <body
         className={`${body.className} min-h-full flex flex-col bg-[var(--bg)] text-[var(--text)] antialiased transition-colors duration-300`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <SiteNav />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

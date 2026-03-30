@@ -30,4 +30,6 @@ export const invoiceTemplate = {
   serviceLinePrefix: "Dienstleistungen gemäß Projekt:",
   vatRatePercent: 19,
   leLabel: "Std.",
+  /** Prototyp: Rechnungs-Stundensatz (CSV-Spalte rate wird ignoriert, Briefing-Fallback 70 €) */
+  prototypeHourlyRate: 70,
 } as const;
