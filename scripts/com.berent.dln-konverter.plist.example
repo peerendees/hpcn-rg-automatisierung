@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS LaunchAgent: DLN-Konverter bei Änderungen in der Inbox ausführen.
+
+  1. Pfad zum Skript unten eintragen (ProgramArguments, zweites Argument).
+  2. WatchPaths anpassen, falls INBOX nicht /Users/Shared/HPCN-Inbox ist.
+  3. Kopieren nach: ~/Library/LaunchAgents/com.berent.dln-konverter.plist
+  4. Laden:
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.berent.dln-konverter.plist
+     Alternativ (ältere macOS): launchctl load ~/Library/LaunchAgents/com.berent.dln-konverter.plist
+  5. Entladen:
+       launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.berent.dln-konverter.plist
+
+  RunAtLoad: einmal nach Login (restliche CSV aus Inbox).
+  WatchPaths: erneuter Start, wenn sich das Verzeichnis ändert (neue Datei).
+  ThrottleInterval: mehrere Events kurz hintereinander zusammenfassen (Sekunden).
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.berent.dln-konverter</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/REPLACE/VOLLSTÄNDIGER/PFAD/zu/dln-konverter.sh</string>
+  </array>
+  <key>WatchPaths</key>
+  <array>
+    <string>/Users/Shared/HPCN-Inbox</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+</dict>
+</plist>
