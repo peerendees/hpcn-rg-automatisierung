@@ -40,7 +40,7 @@ function foldHeader(k: string): string {
     .toLowerCase();
 }
 
-/** Pflicht-Spalten (nach Header-Faltung). Text für Position: „note“ oder „tatigkeit“. */
+/** Pflicht-Spalten (nach Header-Faltung). Positions-/Tätigkeitstext: Spalte „Tätigkeit“ oder gleiche Bedeutung als „note“ (Zeiterfassung); nicht „task“. */
 const REQUIRED_BASE_FOLDS = ["datum", "kunde", "von", "bis"] as const;
 
 const BASE_FOLD_LABEL: Record<(typeof REQUIRED_BASE_FOLDS)[number], string> = {
@@ -75,7 +75,7 @@ function buildCanonicalRow(row: Row, fields: string[]): CanonicalFive {
     else if (fold === "tatigkeit") tatigkeitCol = raw;
     else if (fold === "note") noteCol = raw;
   }
-  /** Zeiterfassungsexport: Beschreibung steht in „note“, nicht „task“/„Tätigkeit“. */
+  /** note hat Vorrang (typischer Export); sonst explizite Spalte Tätigkeit. */
   const tatigkeit = noteCol || tatigkeitCol;
   return { datum, kunde, tatigkeit, von, bis };
 }
@@ -91,11 +91,11 @@ function validateHeaders(fields: string[] | undefined): void {
   }
   const hasActivityText = folds.has("note") || folds.has("tatigkeit");
   if (!hasActivityText) {
-    missingLabels.push("Note oder Tätigkeit");
+    missingLabels.push("Tätigkeit oder note");
   }
   if (missingLabels.length > 0) {
     throw new Error(
-      `Unbekanntes oder unvollständiges CSV-Format. Erwartete Spalten: Datum, Kunde, Von, Bis sowie Note oder Tätigkeit (Delimiter automatisch). Fehlend: ${missingLabels.join(", ")}.`,
+      `Unbekanntes oder unvollständiges CSV-Format. Erwartete Spalten: Datum, Kunde, Von, Bis sowie Tätigkeit — Rohdaten oft als Spalte „note“ exportiert (Delimiter automatisch). Fehlend: ${missingLabels.join(", ")}.`,
     );
   }
 }
@@ -168,7 +168,8 @@ function extractDataRows(parsed: Papa.ParseResult<Row>): Row[] {
 }
 
 /**
- * HPCN-CSV: Datum | Kunde | Note oder Tätigkeit | Von | Bis (+ Summenzeile).
+ * HPCN-CSV: Datum | Kunde | Tätigkeit | Von | Bis (+ Summenzeile).
+ * Tätigkeitstext kann im Rohexport unter „note“ stehen (gleiche Spalte semantisch).
  * Pro Datenzeile eine Position; Abweichung Summenzeile vs. Von/Bis nur als sumWarning.
  */
 export function parseCsv(content: string): CsvParseResult {
