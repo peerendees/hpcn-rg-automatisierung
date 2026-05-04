@@ -7,6 +7,13 @@ export type ParsedCsvPositionRow = {
   dates: string[];
 };
 
+/** Ergebnis von parseCsv: Zeilen plus optionale Summen-Warnung (kein Import-Stopp). */
+export type CsvParseResult = {
+  rows: ParsedCsvPositionRow[];
+  /** z. B. Abweichung Von/Bis vs. Summenzeile oder nicht lesbare Summe */
+  sumWarning: string | null;
+};
+
 /** Wire-Format für Freigabe/Generate (ohne React-Schlüssel). */
 export type DraftInvoiceLineWire = {
   importedHours: number;

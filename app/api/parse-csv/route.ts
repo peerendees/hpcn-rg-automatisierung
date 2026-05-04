@@ -24,11 +24,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const results: { fileName: string; rows: ParsedCsvPositionRow[] }[] = [];
+    const results: {
+      fileName: string;
+      rows: ParsedCsvPositionRow[];
+      sumWarning: string | null;
+    }[] = [];
     for (const file of files) {
       const text = await file.text();
-      const rows = parseCsv(text);
-      results.push({ fileName: file.name, rows });
+      const parsed = parseCsv(text);
+      results.push({
+        fileName: file.name,
+        rows: parsed.rows,
+        sumWarning: parsed.sumWarning,
+      });
     }
 
     return NextResponse.json({ ok: true, results });

@@ -5,6 +5,8 @@ import type { ParsedCsvPositionRow } from "@/types/invoice";
 export type ParsedFileResult = {
   fileName: string;
   rows: ParsedCsvPositionRow[];
+  /** Hinweis bei Summenabweichung oder nicht lesbarer Summenzeile */
+  sumWarning?: string | null;
 };
 
 type Props = {
@@ -77,22 +79,36 @@ export function CsvUploader({
                 : parsed.find((r) => r.fileName === f.name);
             const count = row?.rows?.length ?? 0;
             const kwFirst = row?.rows?.[0]?.kw;
+            const warn =
+              row?.sumWarning != null && String(row.sumWarning).trim() !== ""
+                ? row.sumWarning
+                : null;
             return (
               <li
                 key={`${f.name}-${i}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)]/60 px-4 py-3 text-sm"
+                className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--card)]/60 text-sm"
               >
-                <span className="truncate font-mono text-[var(--text)]">
-                  {f.name}
-                </span>
-                {parsing && (
-                  <span className="text-xs text-[var(--muted)]">…</span>
-                )}
-                {!parsing && row && count > 0 && (
-                  <span className="rounded bg-[var(--copper)]/20 px-2 py-0.5 font-mono text-xs text-[var(--gold)]">
-                    {count} Pos.
-                    {kwFirst != null ? ` · KW${kwFirst}` : ""}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                  <span className="truncate font-mono text-[var(--text)]">
+                    {f.name}
                   </span>
+                  {parsing && (
+                    <span className="text-xs text-[var(--muted)]">…</span>
+                  )}
+                  {!parsing && row && count > 0 && (
+                    <span className="rounded bg-[var(--copper)]/20 px-2 py-0.5 font-mono text-xs text-[var(--gold)]">
+                      {count} Pos.
+                      {kwFirst != null ? ` · KW${kwFirst}` : ""}
+                    </span>
+                  )}
+                </div>
+                {!parsing && warn && (
+                  <div className="border-t border-[var(--copper)]/30 bg-[var(--copper)]/10 px-4 py-2 text-xs leading-relaxed text-[var(--text)]">
+                    <span className="font-mono uppercase tracking-wide text-[var(--copper)]">
+                      Summe{" "}
+                    </span>
+                    {warn}
+                  </div>
                 )}
               </li>
             );

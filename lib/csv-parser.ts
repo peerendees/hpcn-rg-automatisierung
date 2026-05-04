@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import { getISOWeek, getISOWeekYear } from "date-fns";
-import type { ParsedCsvPositionRow } from "@/types/invoice";
+import type { CsvParseResult, ParsedCsvPositionRow } from "@/types/invoice";
 import { parseGermanDateStr } from "@/lib/date-de";
 import { parseDeDecimal } from "@/lib/parse-de-number";
 
@@ -115,16 +115,18 @@ function rowHasSumKeyword(row: CanonicalFive): boolean {
   return /\b(summe|gesamt|insgesamt)\b/i.test(joined);
 }
 
-function extractSumHours(row: Row, fields: string[]): number {
+function tryExtractSumHours(row: Row, fields: string[]): number | null {
   for (let i = fields.length - 1; i >= 0; i--) {
     const key = fields[i]!;
     const raw = String(row[key] ?? "").trim();
     const n = parseDeDecimal(raw);
     if (n !== null && n >= 0 && n < 50000) return n;
   }
-  throw new Error(
-    "Summenzeile gefunden, aber keine Stundenzahl erkannt (erwartet z. B. 37,5).",
-  );
+  return null;
+}
+
+function fmtDeHour(n: number): string {
+  return n.toFixed(2).replace(".", ",");
 }
 
 function formatDateShort(d: Date): string {
@@ -146,9 +148,9 @@ function extractDataRows(parsed: Papa.ParseResult<Row>): Row[] {
 
 /**
  * Neues HPCN-CSV: Datum | Kunde | Tätigkeit | Von | Bis (+ Summenzeile).
- * Pro Datenzeile eine Position; Summenzeile wird gegen Summe Von/Bis geprüft.
+ * Pro Datenzeile eine Position; Abweichung Summenzeile vs. Von/Bis nur als sumWarning.
  */
-export function parseCsv(content: string): ParsedCsvPositionRow[] {
+export function parseCsv(content: string): CsvParseResult {
   const text = normalizeCsvText(content);
   if (!text) throw new Error("CSV-Datei ist leer.");
 
@@ -200,7 +202,7 @@ export function parseCsv(content: string): ParsedCsvPositionRow[] {
 
   let declaredSum: number | null = null;
   if (sumCanon && sumRowRaw) {
-    declaredSum = extractSumHours(sumRowRaw, fields);
+    declaredSum = tryExtractSumHours(sumRowRaw, fields);
   }
 
   const positions: ParsedCsvPositionRow[] = [];
@@ -231,14 +233,19 @@ export function parseCsv(content: string): ParsedCsvPositionRow[] {
     throw new Error("Keine gültigen Datenzeilen mit Datum gefunden.");
   }
 
-  if (declaredSum !== null) {
-    const tol = 0.05;
-    if (Math.abs(computedSum - declaredSum) > tol) {
-      throw new Error(
-        `Summenabgleich fehlgeschlagen: Summe Von/Bis = ${computedSum.toFixed(2)} h, in Summenzeile = ${declaredSum.toFixed(2)} h.`,
-      );
+  let sumWarning: string | null = null;
+  if (sumIndex >= 0 && sumRowRaw) {
+    if (declaredSum === null) {
+      sumWarning =
+        "Summenzeile erkannt, aber keine auslesbare Stundenzahl (z. B. 24 oder 24,0).";
+    } else {
+      const tol = 0.05;
+      if (Math.abs(computedSum - declaredSum) > tol) {
+        const diff = computedSum - declaredSum;
+        sumWarning = `Summenabgleich: Summe Von/Bis = ${fmtDeHour(computedSum)} h, Summenzeile = ${fmtDeHour(declaredSum)} h (Differenz ${fmtDeHour(diff)} h). Bitte prüfen.`;
+      }
     }
   }
 
-  return positions;
+  return { rows: positions, sumWarning };
 }
