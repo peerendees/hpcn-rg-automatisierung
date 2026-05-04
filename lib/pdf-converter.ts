@@ -36,15 +36,31 @@ export async function docxToPdf(docxBuffer: Buffer): Promise<Buffer> {
   const executablePath = await resolveExecutablePath();
   const useBundledChromium =
     process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME;
-  const launchArgs = useBundledChromium
-    ? chromium.args
-    : ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"];
 
-  const browser = await puppeteer.launch({
-    executablePath,
-    args: launchArgs,
-    headless: true,
-  });
+  if (useBundledChromium) {
+    chromium.setGraphicsMode = false;
+  }
+
+  const browser = await puppeteer.launch(
+    useBundledChromium
+      ? {
+          executablePath,
+          args: puppeteer.defaultArgs({
+            args: chromium.args,
+            headless: "shell",
+          }),
+          headless: "shell",
+        }
+      : {
+          executablePath,
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+          ],
+          headless: true,
+        },
+  );
   try {
     const page = await browser.newPage();
     await page.setContent(full, { waitUntil: "networkidle0", timeout: 60_000 });
