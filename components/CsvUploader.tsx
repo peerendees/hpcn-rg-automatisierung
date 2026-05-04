@@ -44,7 +44,8 @@ export function CsvUploader({
           CSV-Dateien
         </p>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Bis zu {maxFiles} Dateien · Spalten: Datum, Kunde, Tätigkeit, Von, Bis ·
+          Bis zu {maxFiles} Dateien · Spalten: Datum, Kunde, Note oder Tätigkeit, Von,
+          Bis ·
           Summenzeile optional · Delimiter automatisch
         </p>
         <label className="mt-6 inline-flex cursor-pointer items-center justify-center rounded-lg border border-[var(--copper)] bg-[var(--copper)]/10 px-5 py-2.5 text-sm font-medium text-[var(--gold)] transition hover:bg-[var(--copper)]/25">

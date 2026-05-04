@@ -27,6 +27,8 @@ export const metadata: Metadata = {
   description: "CSV aus Zeiterfassung zu Rechnung (hpcn)",
   icons: {
     icon: [{ url: "/berent-favicon.webp", type: "image/webp" }],
+    shortcut: [{ url: "/berent-favicon.webp", type: "image/webp" }],
+    apple: [{ url: "/berent-favicon.webp", type: "image/webp" }],
   },
 };
 

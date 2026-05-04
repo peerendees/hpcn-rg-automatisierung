@@ -40,30 +40,44 @@ function foldHeader(k: string): string {
     .toLowerCase();
 }
 
-/** Erwartete Spalten (nach Header-Faltung). */
-const REQUIRED_FOLDS = ["datum", "kunde", "tatigkeit", "von", "bis"] as const;
+/** Pflicht-Spalten (nach Header-Faltung). Text für Position: „note“ oder „tatigkeit“. */
+const REQUIRED_BASE_FOLDS = ["datum", "kunde", "von", "bis"] as const;
 
-type CanonicalFive = Record<(typeof REQUIRED_FOLDS)[number], string>;
+const BASE_FOLD_LABEL: Record<(typeof REQUIRED_BASE_FOLDS)[number], string> = {
+  datum: "Datum",
+  kunde: "Kunde",
+  von: "Von",
+  bis: "Bis",
+};
+
+type CanonicalFive = {
+  datum: string;
+  kunde: string;
+  tatigkeit: string;
+  von: string;
+  bis: string;
+};
 
 function buildCanonicalRow(row: Row, fields: string[]): CanonicalFive {
-  const acc: Partial<CanonicalFive> = {};
+  let datum = "";
+  let kunde = "";
+  let tatigkeitCol = "";
+  let noteCol = "";
+  let von = "";
+  let bis = "";
   for (const f of fields) {
     const fold = foldHeader(f);
-    if (
-      fold === "datum" ||
-      fold === "kunde" ||
-      fold === "tatigkeit" ||
-      fold === "von" ||
-      fold === "bis"
-    ) {
-      acc[fold] = String(row[f] ?? "").trim();
-    }
+    const raw = String(row[f] ?? "").trim();
+    if (fold === "datum") datum = raw;
+    else if (fold === "kunde") kunde = raw;
+    else if (fold === "von") von = raw;
+    else if (fold === "bis") bis = raw;
+    else if (fold === "tatigkeit") tatigkeitCol = raw;
+    else if (fold === "note") noteCol = raw;
   }
-  const full = acc as CanonicalFive;
-  for (const key of REQUIRED_FOLDS) {
-    if (full[key] === undefined) full[key] = "";
-  }
-  return full;
+  /** Zeiterfassungsexport: Beschreibung steht in „note“, nicht „task“/„Tätigkeit“. */
+  const tatigkeit = noteCol || tatigkeitCol;
+  return { datum, kunde, tatigkeit, von, bis };
 }
 
 function validateHeaders(fields: string[] | undefined): void {
@@ -71,10 +85,17 @@ function validateHeaders(fields: string[] | undefined): void {
     throw new Error("CSV ohne Headerzeile.");
   }
   const folds = new Set(fields.map((f) => foldHeader(f)));
-  const missing = REQUIRED_FOLDS.filter((k) => !folds.has(k));
-  if (missing.length > 0) {
+  const missingLabels: string[] = [];
+  for (const k of REQUIRED_BASE_FOLDS) {
+    if (!folds.has(k)) missingLabels.push(BASE_FOLD_LABEL[k]);
+  }
+  const hasActivityText = folds.has("note") || folds.has("tatigkeit");
+  if (!hasActivityText) {
+    missingLabels.push("Note oder Tätigkeit");
+  }
+  if (missingLabels.length > 0) {
     throw new Error(
-      `Unbekanntes oder unvollständiges CSV-Format. Erwartete Spalten: Datum, Kunde, Tätigkeit, Von, Bis (Delimiter automatisch). Fehlend nach Normalisierung: ${missing.join(", ")}.`,
+      `Unbekanntes oder unvollständiges CSV-Format. Erwartete Spalten: Datum, Kunde, Von, Bis sowie Note oder Tätigkeit (Delimiter automatisch). Fehlend: ${missingLabels.join(", ")}.`,
     );
   }
 }
@@ -147,7 +168,7 @@ function extractDataRows(parsed: Papa.ParseResult<Row>): Row[] {
 }
 
 /**
- * Neues HPCN-CSV: Datum | Kunde | Tätigkeit | Von | Bis (+ Summenzeile).
+ * HPCN-CSV: Datum | Kunde | Note oder Tätigkeit | Von | Bis (+ Summenzeile).
  * Pro Datenzeile eine Position; Abweichung Summenzeile vs. Von/Bis nur als sumWarning.
  */
 export function parseCsv(content: string): CsvParseResult {
