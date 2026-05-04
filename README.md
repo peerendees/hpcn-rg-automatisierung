@@ -1,20 +1,42 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
-
-First, run the development server:
+## Lokale Entwicklung
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# → http://localhost:8080 (siehe package.json)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Produktion (MVP) — Umgebungsvariable
+
+Die Routen **`/api/approve-draft`** und **`/api/generate`** signieren die Freigabe mit einem Server-Geheimnis. Ohne gesetztes **`APPROVAL_SECRET`** schlagen Freigabe und Rechnungsexport in **Production** fehl (API antwortet mit Konfigurationsfehler).
+
+| Variable | Erforderlich | Hinweis |
+|----------|--------------|---------|
+| `APPROVAL_SECRET` | **Ja**, sobald `NODE_ENV=production` | Zufällige, lange Zeichenkette (z. B. `openssl rand -hex 32`). Nicht committen. |
+
+**Vercel** war nur als typisches Hosting für `rgform.berent.ai` gemeint — dasselbe gilt für **jeden** Production-Host (Cloudflare Pages, eigener Node-Server, …): dort `APPROVAL_SECRET` in den **Environment Variables** des Projekts anlegen und ein neues Deployment auslösen.
+
+**Was du nachziehen musst:**
+
+1. Ein Geheimnis erzeugen, z. B. `openssl rand -hex 32`.
+2. Im Hosting-Dashboard (z. B. Vercel → Projekt → Settings → Environment Variables) **`APPROVAL_SECRET`** für **Production** setzen.
+3. Redeploy, damit die Variable aktiv wird.
+
+Lokal ohne gesetzte Variable: es gibt einen **nur für Development** gedachten Fallback (unsicher, nie für Production nutzen).
+
+## Vorlage DOCX
+
+```bash
+npm run build:template
+```
+
+Erzeugt `assets/templates/invoice-template.docx` aus `quellen/Vorlage-HPCN-Rechnung.docx`.
+
+---
+
+## Getting Started (create-next-app)
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

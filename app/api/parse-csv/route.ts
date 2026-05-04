@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import type { ParsedCsvPositionRow } from "@/types/invoice";
 import { parseCsv } from "@/lib/csv-parser";
-import type { InvoicePosition } from "@/types/invoice";
 
 export const runtime = "nodejs";
 
@@ -24,11 +24,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const results: { fileName: string; position: InvoicePosition }[] = [];
+    const results: { fileName: string; rows: ParsedCsvPositionRow[] }[] = [];
     for (const file of files) {
       const text = await file.text();
-      const position = parseCsv(text);
-      results.push({ fileName: file.name, position });
+      const rows = parseCsv(text);
+      results.push({ fileName: file.name, rows });
     }
 
     return NextResponse.json({ ok: true, results });

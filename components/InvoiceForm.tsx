@@ -1,9 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { InvoicePosition, OutputFormat } from "@/types/invoice";
-import { CsvUploader, type ParsedRow } from "@/components/CsvUploader";
-import { InvoicePreview } from "@/components/InvoicePreview";
+import type { OutputFormat } from "@/types/invoice";
+import { invoiceTemplate } from "@/lib/invoice-template";
+import {
+  CsvUploader,
+  type ParsedFileResult,
+} from "@/components/CsvUploader";
+import {
+  InvoiceDraftTable,
+  linesToWire,
+  type ClientDraftLine,
+} from "@/components/InvoiceDraftTable";
 import { OutputToggle } from "@/components/OutputToggle";
 
 const STORAGE_KEY = "hpcn-rg-last-invoice-number";
@@ -19,6 +27,13 @@ function suggestNextInvoiceNumber(previous: string | null): string {
   return previous.slice(0, previous.lastIndexOf(last)) + next;
 }
 
+function newLineId(fi: number, ri: number): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `l-${fi}-${ri}-${Date.now()}`;
+}
+
 export function InvoiceForm() {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
@@ -27,11 +42,22 @@ export function InvoiceForm() {
   );
   const [files, setFiles] = useState<File[]>([]);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("docx");
-  const [parsed, setParsed] = useState<ParsedRow[]>([]);
+  const [parsedFiles, setParsedFiles] = useState<ParsedFileResult[]>([]);
+  const [lines, setLines] = useState<ClientDraftLine[]>([]);
+  const [globalRate, setGlobalRate] = useState<number>(
+    () => invoiceTemplate.prototypeHourlyRate,
+  );
+  const [includeKwDateBlock, setIncludeKwDateBlock] = useState(false);
+  const [approvalToken, setApprovalToken] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [approving, setApproving] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+
+  const globalRateRef = useRef(globalRate);
+  globalRateRef.current = globalRate;
 
   useEffect(() => {
     try {
@@ -54,7 +80,7 @@ export function InvoiceForm() {
   useEffect(() => {
     const list = filesRef.current;
     if (list.length === 0) {
-      setParsed([]);
+      setParsedFiles([]);
       setParseError(null);
       return;
     }
@@ -70,22 +96,99 @@ export function InvoiceForm() {
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error ?? "Parse fehlgeschlagen");
-        setParsed(data.results as ParsedRow[]);
+        setParsedFiles(data.results as ParsedFileResult[]);
       })
       .catch((e: Error) => {
         if (e.name === "AbortError") return;
         setParseError(e.message);
-        setParsed([]);
+        setParsedFiles([]);
       })
       .finally(() => setParsing(false));
 
     return () => ac.abort();
   }, [fileKey]);
 
-  const positions: InvoicePosition[] = useMemo(
-    () => parsed.map((r) => r.position),
-    [parsed],
-  );
+  useEffect(() => {
+    if (parsedFiles.length === 0) {
+      setLines([]);
+      return;
+    }
+    const rate = globalRateRef.current;
+    const seeded = parsedFiles.flatMap((f, fi) =>
+      f.rows.map((r, ri) => ({
+        id: newLineId(fi, ri),
+        importedHours: r.importedHours,
+        overrideHoursText: "",
+        activityLabel: r.activityLabel,
+        rate,
+        rateUserOverride: false,
+        kw: r.kw,
+        year: r.year,
+        dates: [...r.dates],
+      })),
+    );
+    setLines(seeded);
+  }, [fileKey, parsedFiles]);
+
+  useEffect(() => {
+    setApprovalToken(null);
+    setApproveError(null);
+  }, [lines, includeKwDateBlock, invoiceNumber, projectTitle, invoiceDate]);
+
+  const handleGlobalRateChange = useCallback((next: number) => {
+    setGlobalRate(next);
+    setLines((prev) =>
+      prev.map((l) =>
+        l.rateUserOverride ? l : { ...l, rate: next },
+      ),
+    );
+  }, []);
+
+  const handleApprove = useCallback(async () => {
+    setApproveError(null);
+    if (!invoiceNumber.trim() || !projectTitle.trim()) {
+      setApproveError("Rechnungsnummer und Projekttitel ausfüllen.");
+      return;
+    }
+    if (lines.length === 0) {
+      setApproveError("Keine Positionen zum Freigeben.");
+      return;
+    }
+
+    setApproving(true);
+    try {
+      const body = {
+        invoiceNumber: invoiceNumber.trim(),
+        invoiceDate,
+        projectTitle: projectTitle.trim(),
+        includeKwDateBlock,
+        lines: linesToWire(lines),
+      };
+      const res = await fetch("/api/approve-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      setApprovalToken(String(data.approvalToken));
+    } catch (e) {
+      setApprovalToken(null);
+      setApproveError(
+        e instanceof Error ? e.message : "Freigabe fehlgeschlagen",
+      );
+    } finally {
+      setApproving(false);
+    }
+  }, [
+    invoiceNumber,
+    invoiceDate,
+    projectTitle,
+    includeKwDateBlock,
+    lines,
+  ]);
 
   const handleGenerate = useCallback(async () => {
     setGenError(null);
@@ -93,22 +196,31 @@ export function InvoiceForm() {
       setGenError("Rechnungsnummer und Projekttitel ausfüllen.");
       return;
     }
-    if (files.length === 0 || positions.length === 0) {
-      setGenError("Mindestens eine gültige CSV-Datei.");
+    if (lines.length === 0) {
+      setGenError("Keine Positionen.");
+      return;
+    }
+    if (!approvalToken) {
+      setGenError("Bitte zuerst Positionen freigeben.");
       return;
     }
 
     setGenerating(true);
     try {
-      const fd = new FormData();
-      fd.set("invoiceNumber", invoiceNumber.trim());
-      const [y, mo, d] = invoiceDate.split("-").map(Number);
-      fd.set("date", new Date(y, mo - 1, d, 12, 0, 0).toISOString());
-      fd.set("projectTitle", projectTitle.trim());
-      fd.set("outputFormat", outputFormat);
-      files.forEach((f) => fd.append("csv", f));
-
-      const res = await fetch("/api/generate", { method: "POST", body: fd });
+      const body = {
+        invoiceNumber: invoiceNumber.trim(),
+        invoiceDate,
+        projectTitle: projectTitle.trim(),
+        includeKwDateBlock,
+        lines: linesToWire(lines),
+        outputFormat,
+        approvalToken,
+      };
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `HTTP ${res.status}`);
@@ -137,13 +249,16 @@ export function InvoiceForm() {
       setGenerating(false);
     }
   }, [
-    files,
-    invoiceDate,
     invoiceNumber,
-    outputFormat,
-    positions.length,
+    invoiceDate,
     projectTitle,
+    includeKwDateBlock,
+    lines,
+    outputFormat,
+    approvalToken,
   ]);
+
+  const draftDisabled = parsing || files.length === 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -199,24 +314,63 @@ export function InvoiceForm() {
           <CsvUploader
             files={files}
             onFilesChange={setFiles}
-            parsed={parsed}
+            parsed={parsedFiles}
             parsing={parsing}
             parseError={parseError}
           />
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
-        <h2 className="font-[family-name:var(--font-display)] text-xl tracking-[0.08em] text-[var(--gold)]">
-          VORSCHAU
-        </h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Summen und Positionen nach erfolgreichem CSV-Import.
-        </p>
-        <div className="mt-4">
-          <InvoicePreview positions={positions} />
-        </div>
-      </section>
+      {lines.length > 0 && (
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
+          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-[0.08em] text-[var(--gold)]">
+            POSITIONEN BEARBEITEN
+          </h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Importierte Stunden, optional überschreiben; Tätigkeit editieren.
+            Freigabe bindet den Datenstand serverseitig für den Export.
+          </p>
+          <div className="mt-4">
+            <InvoiceDraftTable
+              lines={lines}
+              onLinesChange={setLines}
+              globalRate={globalRate}
+              onGlobalRateChange={handleGlobalRateChange}
+              includeKwDateBlock={includeKwDateBlock}
+              onIncludeKwDateBlockChange={setIncludeKwDateBlock}
+              disabled={draftDisabled}
+            />
+          </div>
+
+          {approveError && (
+            <p className="mt-4 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-2 text-sm text-red-200">
+              {approveError}
+            </p>
+          )}
+
+          <button
+            type="button"
+            disabled={
+              approving ||
+              parsing ||
+              lines.length === 0 ||
+              !invoiceNumber.trim() ||
+              !projectTitle.trim()
+            }
+            onClick={() => void handleApprove()}
+            className="mt-6 rounded-lg border border-[var(--border)] bg-[var(--card)] px-5 py-2.5 font-[family-name:var(--font-display)] text-sm tracking-wider text-[var(--gold)] transition hover:border-[var(--copper)] hover:bg-[var(--copper)]/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {approving ? "Freigabe wird erstellt …" : "Positionen freigeben"}
+          </button>
+
+          {approvalToken && (
+            <p className="mt-3 text-xs font-mono text-[var(--muted)]">
+              Freigabe aktiv — Änderungen an Positionen setzen die Freigabe
+              zurück.
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
         <h2 className="font-[family-name:var(--font-display)] text-xl tracking-[0.08em] text-[var(--gold)]">
@@ -235,14 +389,15 @@ export function InvoiceForm() {
           disabled={
             generating ||
             parsing ||
-            positions.length === 0 ||
+            lines.length === 0 ||
             !invoiceNumber.trim() ||
-            !projectTitle.trim()
+            !projectTitle.trim() ||
+            !approvalToken
           }
-          onClick={handleGenerate}
+          onClick={() => void handleGenerate()}
           className="mt-6 w-full rounded-lg border border-[var(--copper)] bg-[var(--copper)]/90 py-3 font-[family-name:var(--font-display)] text-lg tracking-wider text-[#1a1108] transition hover:bg-[var(--copper)] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {generating ? "Wird erzeugt …" : "Rechnung erzeugen & herunterladen"}
+          {generating ? "Wird erzeugt …" : "Rechnung erzeugen und herunterladen"}
         </button>
       </section>
     </div>

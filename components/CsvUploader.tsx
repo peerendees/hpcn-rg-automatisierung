@@ -1,13 +1,16 @@
 "use client";
 
-import type { InvoicePosition } from "@/types/invoice";
+import type { ParsedCsvPositionRow } from "@/types/invoice";
 
-export type ParsedRow = { fileName: string; position: InvoicePosition };
+export type ParsedFileResult = {
+  fileName: string;
+  rows: ParsedCsvPositionRow[];
+};
 
 type Props = {
   files: File[];
   onFilesChange: (files: File[]) => void;
-  parsed: ParsedRow[];
+  parsed: ParsedFileResult[];
   parsing: boolean;
   parseError: string | null;
   maxFiles?: number;
@@ -39,7 +42,8 @@ export function CsvUploader({
           CSV-Dateien
         </p>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Bis zu {maxFiles} Dateien · Semikolon · Zeiterfassungsexport
+          Bis zu {maxFiles} Dateien · Spalten: Datum, Kunde, Tätigkeit, Von, Bis ·
+          Summenzeile optional · Delimiter automatisch
         </p>
         <label className="mt-6 inline-flex cursor-pointer items-center justify-center rounded-lg border border-[var(--copper)] bg-[var(--copper)]/10 px-5 py-2.5 text-sm font-medium text-[var(--gold)] transition hover:bg-[var(--copper)]/25">
           Dateien wählen
@@ -71,6 +75,8 @@ export function CsvUploader({
               parsed[i]?.fileName === f.name
                 ? parsed[i]
                 : parsed.find((r) => r.fileName === f.name);
+            const count = row?.rows?.length ?? 0;
+            const kwFirst = row?.rows?.[0]?.kw;
             return (
               <li
                 key={`${f.name}-${i}`}
@@ -82,9 +88,10 @@ export function CsvUploader({
                 {parsing && (
                   <span className="text-xs text-[var(--muted)]">…</span>
                 )}
-                {!parsing && row && (
+                {!parsing && row && count > 0 && (
                   <span className="rounded bg-[var(--copper)]/20 px-2 py-0.5 font-mono text-xs text-[var(--gold)]">
-                    KW{row.position.kw}
+                    {count} Pos.
+                    {kwFirst != null ? ` · KW${kwFirst}` : ""}
                   </span>
                 )}
               </li>

@@ -1,11 +1,14 @@
 import Papa from "papaparse";
 import { getISOWeek, getISOWeekYear } from "date-fns";
-import type { InvoicePosition } from "@/types/invoice";
-import { invoiceTemplate } from "@/lib/invoice-template";
+import type { ParsedCsvPositionRow } from "@/types/invoice";
+import { parseGermanDateStr } from "@/lib/date-de";
+import { parseDeDecimal } from "@/lib/parse-de-number";
+
+export { parseGermanDateStr } from "@/lib/date-de";
 
 type Row = Record<string, string>;
 
-/** BOM / Whitespace am Anfang; Zeilenenden vereinheitlichen (Upload von macOS/Windows). */
+/** BOM / Whitespace am Anfang; Zeilenenden vereinheitlichen. */
 function normalizeCsvText(content: string): string {
   return content
     .replace(/^\uFEFF/, "")
@@ -14,7 +17,6 @@ function normalizeCsvText(content: string): string {
     .trim();
 }
 
-/** Excel/Export: erste Spalte heißt ggf. "\ufefftype" statt "type". */
 function normalizeRowKeys(row: Row): Row {
   const o: Row = {};
   for (const [k, v] of Object.entries(row)) {
@@ -28,77 +30,105 @@ function rowHasAnyValue(row: Row): boolean {
   return Object.values(row).some((v) => String(v).trim() !== "");
 }
 
-function getCell(row: Row, ...names: string[]): string {
-  const keys = Object.keys(row);
-  for (const name of names) {
-    const hit = keys.find((k) => k.toLowerCase() === name.toLowerCase());
-    if (hit !== undefined) return (row[hit] ?? "").trim();
-  }
-  return "";
+function foldHeader(k: string): string {
+  return k
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, "")
+    .toLowerCase();
 }
 
-/** Summiert duration-Werte zu Stunden (CSV: Minuten, HH:MM:SS oder Dezimal-Stunden). */
-function parseDurationCell(raw: string, fileUsesMinutes: boolean): number {
-  const s = raw.trim();
-  if (!s) return 0;
+/** Erwartete Spalten (nach Header-Faltung). */
+const REQUIRED_FOLDS = ["datum", "kunde", "tatigkeit", "von", "bis"] as const;
 
-  if (s.includes(":")) {
-    const parts = s.split(":").map((p) => parseInt(p, 10));
-    if (parts.some((n) => Number.isNaN(n))) return 0;
-    const h = parts[0] ?? 0;
-    const m = parts[1] ?? 0;
-    const sec = parts[2] ?? 0;
-    return h + m / 60 + sec / 3600;
+type CanonicalFive = Record<(typeof REQUIRED_FOLDS)[number], string>;
+
+function buildCanonicalRow(row: Row, fields: string[]): CanonicalFive {
+  const acc: Partial<CanonicalFive> = {};
+  for (const f of fields) {
+    const fold = foldHeader(f);
+    if (
+      fold === "datum" ||
+      fold === "kunde" ||
+      fold === "tatigkeit" ||
+      fold === "von" ||
+      fold === "bis"
+    ) {
+      acc[fold] = String(row[f] ?? "").trim();
+    }
   }
-
-  const n = parseFloat(s.replace(",", "."));
-  if (Number.isNaN(n)) return 0;
-  if (fileUsesMinutes) return n / 60;
-  return n;
+  const full = acc as CanonicalFive;
+  for (const key of REQUIRED_FOLDS) {
+    if (full[key] === undefined) full[key] = "";
+  }
+  return full;
 }
 
-function detectMinuteBased(rows: Row[], durationKey: string): boolean {
-  const nums: number[] = [];
-  for (const row of rows) {
-    const raw = getCell(row, durationKey);
-    if (!raw || raw.includes(":")) continue;
-    const n = parseFloat(raw.replace(",", "."));
-    if (!Number.isNaN(n)) nums.push(n);
+function validateHeaders(fields: string[] | undefined): void {
+  if (!fields?.length) {
+    throw new Error("CSV ohne Headerzeile.");
   }
-  if (nums.length === 0) return false;
-  const maxVal = Math.max(...nums);
-  return maxVal > 48;
+  const folds = new Set(fields.map((f) => foldHeader(f)));
+  const missing = REQUIRED_FOLDS.filter((k) => !folds.has(k));
+  if (missing.length > 0) {
+    throw new Error(
+      `Unbekanntes oder unvollständiges CSV-Format. Erwartete Spalten: Datum, Kunde, Tätigkeit, Von, Bis (Delimiter automatisch). Fehlend nach Normalisierung: ${missing.join(", ")}.`,
+    );
+  }
 }
 
-/** DD.MM.YY oder DD.MM.YYYY → Date (lokal, Mittag wegen DST). */
-export function parseGermanDateStr(s: string): Date | null {
-  const t = s.trim();
-  const m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+function parseHm(raw: string): { h: number; m: number } | null {
+  const t = raw.trim();
+  const m = t.match(/^(\d{1,2}):(\d{2})$/);
   if (!m) return null;
-  const dd = parseInt(m[1], 10);
-  const mm = parseInt(m[2], 10);
-  let yy = parseInt(m[3], 10);
-  if (yy < 100) yy += 2000;
-  const d = new Date(yy, mm - 1, dd, 12, 0, 0, 0);
-  return Number.isNaN(d.getTime()) ? null : d;
+  const h = parseInt(m[1]!, 10);
+  const min = parseInt(m[2]!, 10);
+  if (Number.isNaN(h) || Number.isNaN(min) || min > 59 || h > 47)
+    return null;
+  return { h, m: min };
 }
 
-export function buildPositionText(
-  kw: number,
-  dates: Date[],
-  totalHours: number,
-): string {
-  const sorted = [...dates].sort((a, b) => a.getTime() - b.getTime());
-  const dayStrings = sorted.map((d, i) => {
-    const isLastOfMonth =
-      i === sorted.length - 1 ||
-      sorted[i + 1]!.getMonth() !== d.getMonth();
-    return isLastOfMonth
-      ? `${d.getDate()}.${d.getMonth() + 1}.`
-      : `${d.getDate()}.`;
-  });
-  const hoursFormatted = totalHours.toFixed(1).replace(".", ",");
-  return `KW${kw}: ${dayStrings.join(", ")}: = ${hoursFormatted} Std.`;
+/** Stunden aus Von/Bis am selben Kalendertag. */
+export function hoursFromVonBis(vonRaw: string, bisRaw: string): number {
+  const von = parseHm(vonRaw);
+  const bis = parseHm(bisRaw);
+  if (!von || !bis) {
+    throw new Error(
+      `Von/Bis müssen als HH:MM angegeben sein (z. B. 09:30 und 17:00).`,
+    );
+  }
+  const start = von.h + von.m / 60;
+  const end = bis.h + bis.m / 60;
+  if (end < start) {
+    throw new Error(
+      "Endzeit liegt vor Startzeit (über Mitternacht aktuell nicht unterstützt).",
+    );
+  }
+  return end - start;
+}
+
+function rowHasSumKeyword(row: CanonicalFive): boolean {
+  const joined =
+    `${row.datum} ${row.kunde} ${row.tatigkeit} ${row.von} ${row.bis}`.toLowerCase();
+  return /\b(summe|gesamt|insgesamt)\b/i.test(joined);
+}
+
+function extractSumHours(row: Row, fields: string[]): number {
+  for (let i = fields.length - 1; i >= 0; i--) {
+    const key = fields[i]!;
+    const raw = String(row[key] ?? "").trim();
+    const n = parseDeDecimal(raw);
+    if (n !== null && n >= 0 && n < 50000) return n;
+  }
+  throw new Error(
+    "Summenzeile gefunden, aber keine Stundenzahl erkannt (erwartet z. B. 37,5).",
+  );
+}
+
+function formatDateShort(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(-2)}`;
 }
 
 function parsePapa(text: string, delimiter: string | undefined): Papa.ParseResult<Row> {
@@ -115,13 +145,12 @@ function extractDataRows(parsed: Papa.ParseResult<Row>): Row[] {
 }
 
 /**
- * Parst semikolon-separiertes CSV (Zeiterfassung) zu einer Rechnungsposition.
+ * Neues HPCN-CSV: Datum | Kunde | Tätigkeit | Von | Bis (+ Summenzeile).
+ * Pro Datenzeile eine Position; Summenzeile wird gegen Summe Von/Bis geprüft.
  */
-export function parseCsv(content: string): InvoicePosition {
+export function parseCsv(content: string): ParsedCsvPositionRow[] {
   const text = normalizeCsvText(content);
-  if (!text) {
-    throw new Error("CSV-Datei ist leer.");
-  }
+  if (!text) throw new Error("CSV-Datei ist leer.");
 
   let parsed = parsePapa(text, ";");
   if (parsed.errors.length > 0) {
@@ -130,8 +159,6 @@ export function parseCsv(content: string): InvoicePosition {
   }
 
   let rows = extractDataRows(parsed);
-
-  // Fallback: Auto-Delimiter (z. B. anderes Trennzeichen oder BOM-Probleme)
   if (rows.length === 0) {
     parsed = parsePapa(text, undefined);
     if (parsed.errors.length > 0) {
@@ -141,57 +168,77 @@ export function parseCsv(content: string): InvoicePosition {
     rows = extractDataRows(parsed);
   }
 
+  const fields = parsed.meta.fields ?? [];
+  validateHeaders(fields);
+
   if (rows.length === 0) {
-    const preview = text.slice(0, 120).replace(/\n/g, "\\n");
-    throw new Error(
-      `CSV enthält keine Datenzeilen (nach Header). Vorschau: ${preview}${text.length > 120 ? "…" : ""}`,
-    );
+    throw new Error("CSV enthält keine Datenzeilen nach dem Header.");
   }
 
-  const durationKey = "duration";
-  const dateKey = "date";
+  const canonicalRows = rows.map((r) => buildCanonicalRow(r, fields));
 
-  const fileUsesMinutes = detectMinuteBased(rows, durationKey);
-
-  let totalHours = 0;
-  const dateSet = new Map<number, Date>();
-
-  for (const row of rows) {
-    totalHours += parseDurationCell(
-      getCell(row, durationKey),
-      fileUsesMinutes,
-    );
-    const ds = getCell(row, dateKey);
-    const d = parseGermanDateStr(ds);
-    if (d) dateSet.set(d.getTime(), d);
+  let sumIndex = -1;
+  for (let i = canonicalRows.length - 1; i >= 0; i--) {
+    if (rowHasSumKeyword(canonicalRows[i]!)) {
+      sumIndex = i;
+      break;
+    }
   }
 
-  const uniqueDates = [...dateSet.values()].sort(
-    (a, b) => a.getTime() - b.getTime(),
-  );
-  if (uniqueDates.length === 0) {
-    throw new Error(
-      "Keine gültigen Datumsangaben in der Spalte date (Format TT.MM.JJ).",
-    );
+  if (sumIndex === -1 && canonicalRows.length >= 1) {
+    const last = canonicalRows[canonicalRows.length - 1]!;
+    if (!parseGermanDateStr(last.datum)) {
+      sumIndex = canonicalRows.length - 1;
+    }
   }
 
-  const anchor = uniqueDates[0]!;
-  const kw = getISOWeek(anchor);
-  const year = getISOWeekYear(anchor);
+  const bodyCanon =
+    sumIndex >= 0 ? canonicalRows.slice(0, sumIndex) : [...canonicalRows];
+  const sumCanon =
+    sumIndex >= 0 ? canonicalRows[sumIndex]! : null;
+  const sumRowRaw = sumIndex >= 0 ? rows[sumIndex]! : null;
 
-  const rate = invoiceTemplate.prototypeHourlyRate;
+  let declaredSum: number | null = null;
+  if (sumCanon && sumRowRaw) {
+    declaredSum = extractSumHours(sumRowRaw, fields);
+  }
 
-  const positionText = buildPositionText(kw, uniqueDates, totalHours);
+  const positions: ParsedCsvPositionRow[] = [];
+  let computedSum = 0;
 
-  return {
-    kw,
-    year,
-    totalHours,
-    dates: uniqueDates.map(
-      (d) =>
-        `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(-2)}`,
-    ),
-    rate,
-    positionText,
-  };
+  for (let i = 0; i < bodyCanon.length; i++) {
+    const c = bodyCanon[i]!;
+    const d = parseGermanDateStr(c.datum);
+    if (!d) {
+      throw new Error(
+        `Zeile ${i + 2}: Ungültiges Datum „${c.datum}“ (Format TT.MM.JJ oder TT.MM.JJJJ).`,
+      );
+    }
+    const hrs = hoursFromVonBis(c.von, c.bis);
+    computedSum += hrs;
+    const kw = getISOWeek(d);
+    const year = getISOWeekYear(d);
+    positions.push({
+      importedHours: hrs,
+      activityLabel: c.tatigkeit,
+      kw,
+      year,
+      dates: [formatDateShort(d)],
+    });
+  }
+
+  if (positions.length === 0) {
+    throw new Error("Keine gültigen Datenzeilen mit Datum gefunden.");
+  }
+
+  if (declaredSum !== null) {
+    const tol = 0.05;
+    if (Math.abs(computedSum - declaredSum) > tol) {
+      throw new Error(
+        `Summenabgleich fehlgeschlagen: Summe Von/Bis = ${computedSum.toFixed(2)} h, in Summenzeile = ${declaredSum.toFixed(2)} h.`,
+      );
+    }
+  }
+
+  return positions;
 }
