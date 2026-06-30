@@ -44,7 +44,11 @@ find "$INBOX" -maxdepth 1 -name "*.csv" | while read -r INFILE; do
   DATE_COL=-1; CATEGORY_COL=-1; NOTE_COL=-1; START_COL=-1; END_COL=-1
 
   for i in "${!COLS[@]}"; do
-    case "${COLS[$i]}" in
+    # Anführungszeichen und Whitespace strippen (manche Exporte quoten den Header)
+    COL_CLEAN="${COLS[$i]//\"/}"
+    COL_CLEAN="${COL_CLEAN#"${COL_CLEAN%%[![:space:]]*}"}"
+    COL_CLEAN="${COL_CLEAN%"${COL_CLEAN##*[![:space:]]}"}"
+    case "$COL_CLEAN" in
       date)        DATE_COL=$i ;;
       category)    CATEGORY_COL=$i ;;
       note)        NOTE_COL=$i ;;
@@ -87,17 +91,6 @@ find "$INBOX" -maxdepth 1 -name "*.csv" | while read -r INFILE; do
   printf "%s
 " "Datum;Kunde;Tätigkeit;Von;Bis" > "$OUTFILE"
 
-  # Stunden summieren via awk
-  TOTAL_MINUTES=$(awk -F';' -v dc=$((DATE_COL+1)) -v sc=$((START_COL+1)) -v ec=$((END_COL+1)) '
-    NR > 1 && $dc != "" {
-      split($sc, von, ":")
-      split($ec, bis, ":")
-      diff = (bis[1] * 60 + bis[2]) - (von[1] * 60 + von[2])
-      if (diff > 0) total += diff
-    }
-    END { print total+0 }
-  ' "$INFILE")
-
   # Datenzeilen schreiben
   tail -n +2 "$INFILE" | while IFS=';' read -ra ROW; do
     DATUM="${ROW[$DATE_COL]}"
@@ -109,11 +102,7 @@ find "$INBOX" -maxdepth 1 -name "*.csv" | while read -r INFILE; do
     echo "${DATUM};${KUNDE};${TAETIGKEIT};${VON};${BIS}" >> "$OUTFILE"
   done
 
-  # Summe anhängen
-  DECIMAL=$(echo "scale=1; $TOTAL_MINUTES / 60" | bc | sed 's/\./,/')
-  echo ";;Summe;;${DECIMAL}" >> "$OUTFILE"
-
-  log "Fertig: ${OUTFILENAME} — Gesamtstunden: ${DECIMAL}"
+  log "Fertig: ${OUTFILENAME}"
 
   # Eingabedatei löschen
   rm "$INFILE"
