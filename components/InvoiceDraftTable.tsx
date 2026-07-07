@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { DraftInvoiceLineWire, InvoicePosition } from "@/types/invoice";
 import { invoiceTemplate } from "@/lib/invoice-template";
 import {
@@ -9,11 +10,14 @@ import {
 } from "@/lib/invoice-draft";
 import { formatDeCurrency, formatDeDecimal } from "@/lib/format-de";
 import { parseDeDecimal } from "@/lib/parse-de-number";
+import { deliveryDateLine } from "@/lib/invoice-spec";
 
 export type ClientDraftLine = Omit<DraftInvoiceLineWire, "overrideHoursText"> & {
   id: string;
   /** Roh-Eingabe Überschreib-Stunden (leer = Import) */
   overrideHoursText: string;
+  /** Roh-Eingabe Stundensatz (wird erst bei Blur geparst/formatiert) */
+  rateText: string;
 };
 
 type Props = {
@@ -42,6 +46,13 @@ export function linesToWire(lines: ClientDraftLine[]): DraftInvoiceLineWire[] {
   }));
 }
 
+/** Parst eine Satz-Eingabe; null bei ungültig/negativ. */
+export function parseRateInput(raw: string): number | null {
+  const n = parseDeDecimal(raw);
+  if (n === null || n < 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
 export function InvoiceDraftTable({
   lines,
   onLinesChange,
@@ -51,6 +62,9 @@ export function InvoiceDraftTable({
   onIncludeKwDateBlockChange,
   disabled,
 }: Props) {
+  const [globalRateText, setGlobalRateText] = useState(() =>
+    formatDeDecimal(globalRate, 2),
+  );
   let positionsPreview: InvoicePosition[] = [];
   try {
     positionsPreview = draftLinesToInvoicePositions(
@@ -91,11 +105,16 @@ export function InvoiceDraftTable({
             type="text"
             inputMode="decimal"
             disabled={disabled}
-            value={formatDeDecimal(globalRate, 2)}
-            onChange={(e) => {
-              const n = parseDeDecimal(e.target.value);
-              if (n === null || n < 0) return;
-              onGlobalRateChange(Math.round(n * 100) / 100);
+            value={globalRateText}
+            onChange={(e) => setGlobalRateText(e.target.value)}
+            onBlur={() => {
+              const n = parseRateInput(globalRateText);
+              if (n === null) {
+                setGlobalRateText(formatDeDecimal(globalRate, 2));
+                return;
+              }
+              setGlobalRateText(formatDeDecimal(n, 2));
+              onGlobalRateChange(n);
             }}
             className="w-28 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono text-sm text-[var(--text)] outline-none focus:border-[var(--copper)] focus:ring-1 focus:ring-[var(--copper)]/40"
           />
@@ -167,6 +186,11 @@ export function InvoiceDraftTable({
                     {invoiceTemplate.leLabel}
                   </td>
                   <td className="p-2 align-top">
+                    {deliveryDateLine(line.dates) && (
+                      <p className="mb-1 font-mono text-[11px] leading-snug text-[var(--muted)]">
+                        {deliveryDateLine(line.dates)}
+                      </p>
+                    )}
                     <textarea
                       disabled={disabled}
                       rows={2}
@@ -182,12 +206,21 @@ export function InvoiceDraftTable({
                       type="text"
                       inputMode="decimal"
                       disabled={disabled}
-                      value={formatDeDecimal(line.rate, 2)}
-                      onChange={(e) => {
-                        const n = parseDeDecimal(e.target.value);
-                        if (n === null || n < 0) return;
+                      value={line.rateText}
+                      onChange={(e) =>
+                        patchLine(i, { rateText: e.target.value })
+                      }
+                      onBlur={() => {
+                        const n = parseRateInput(line.rateText);
+                        if (n === null) {
+                          patchLine(i, {
+                            rateText: formatDeDecimal(line.rate, 2),
+                          });
+                          return;
+                        }
                         patchLine(i, {
-                          rate: Math.round(n * 100) / 100,
+                          rate: n,
+                          rateText: formatDeDecimal(n, 2),
                           rateUserOverride: true,
                         });
                       }}

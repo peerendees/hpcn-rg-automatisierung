@@ -1,4 +1,16 @@
-import { parseGermanDateStr } from "@/lib/date-de";
+import { formatDeDateLong, parseGermanDateStr } from "@/lib/date-de";
+
+/**
+ * Erste Zeile der Spezifikationszelle: „Lieferungs- und Leistungsdatum: TT.MM.JJJJ".
+ * null, wenn kein Datum vorliegt/parsebar ist.
+ */
+export function deliveryDateLine(datesDisplay: string[]): string | null {
+  const first = datesDisplay
+    .map((s) => parseGermanDateStr(s))
+    .find((d): d is Date => d !== null);
+  if (!first) return null;
+  return `Lieferungs- und Leistungsdatum: ${formatDeDateLong(first)}`;
+}
 
 /**
  * KW-/Datums-/Std.-Block wie in der bisherigen Rechnungsvorlage (ohne Tätigkeitstext).

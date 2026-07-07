@@ -7,6 +7,14 @@ import { de } from "date-fns/locale";
 import type { InvoicePosition } from "@/types/invoice";
 import { formatDeDecimal } from "@/lib/format-de";
 import { invoiceTemplate } from "@/lib/invoice-template";
+import { deliveryDateLine } from "@/lib/invoice-spec";
+
+/** Spezifikationszelle: Datumszeile aus der CSV, darunter der Tätigkeitstext. */
+function buildSpecCell(p: InvoicePosition): string {
+  const dateLine = deliveryDateLine(p.dates);
+  if (!dateLine) return p.positionText;
+  return p.positionText ? `${dateLine}\n${p.positionText}` : dateLine;
+}
 
 export type BuildInvoiceInput = {
   invoiceNumber: string;
@@ -62,7 +70,7 @@ export async function buildInvoiceDocx(input: BuildInvoiceInput): Promise<Buffer
       pos: String(i + 1).padStart(2, "0"),
       hours: formatDeDecimal(p.totalHours, 1),
       le: invoiceTemplate.leLabel,
-      spec: `Lieferungs- und Leistungsdatum: ${p.positionText}`,
+      spec: buildSpecCell(p),
       ep: formatDeDecimal(p.rate, 2),
       gp: formatDeDecimal(lineNet(p), 2),
     })),

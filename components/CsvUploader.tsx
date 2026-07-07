@@ -24,8 +24,12 @@ export function CsvUploader({
   parsed,
   parsing,
   parseError,
-  maxFiles = 4,
+  maxFiles = 2,
 }: Props) {
+  function addFiles(incoming: File[]) {
+    onFilesChange([...files, ...incoming].slice(0, maxFiles));
+  }
+
   return (
     <div className="space-y-4">
       <div
@@ -33,11 +37,7 @@ export function CsvUploader({
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
-          const next = [...files, ...Array.from(e.dataTransfer.files)].slice(
-            0,
-            maxFiles,
-          );
-          onFilesChange(next);
+          addFiles(Array.from(e.dataTransfer.files));
         }}
       >
         <p className="font-[family-name:var(--font-display)] text-lg tracking-wide text-[var(--gold)]">
@@ -56,10 +56,10 @@ export function CsvUploader({
             multiple
             className="sr-only"
             onChange={(e) => {
-              const list = e.target.files
-                ? Array.from(e.target.files).slice(0, maxFiles)
-                : [];
-              onFilesChange(list);
+              if (e.target.files) {
+                addFiles(Array.from(e.target.files));
+              }
+              e.target.value = "";
             }}
           />
         </label>
@@ -93,15 +93,28 @@ export function CsvUploader({
                   <span className="truncate font-mono text-[var(--text)]">
                     {f.name}
                   </span>
-                  {parsing && (
-                    <span className="text-xs text-[var(--muted)]">…</span>
-                  )}
-                  {!parsing && row && count > 0 && (
-                    <span className="rounded bg-[var(--copper)]/20 px-2 py-0.5 font-mono text-xs text-[var(--gold)]">
-                      {count} Pos.
-                      {kwFirst != null ? ` · KW${kwFirst}` : ""}
-                    </span>
-                  )}
+                  <span className="flex items-center gap-2">
+                    {parsing && (
+                      <span className="text-xs text-[var(--muted)]">…</span>
+                    )}
+                    {!parsing && row && count > 0 && (
+                      <span className="rounded bg-[var(--copper)]/20 px-2 py-0.5 font-mono text-xs text-[var(--gold)]">
+                        {count} Pos.
+                        {kwFirst != null ? ` · KW${kwFirst}` : ""}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      aria-label={`${f.name} entfernen`}
+                      title="Datei entfernen"
+                      onClick={() =>
+                        onFilesChange(files.filter((_, fi) => fi !== i))
+                      }
+                      className="rounded border border-[var(--border)] px-2 py-0.5 font-mono text-xs text-[var(--muted)] transition hover:border-[var(--copper)] hover:text-[var(--text)]"
+                    >
+                      ✕
+                    </button>
+                  </span>
                 </div>
                 {!parsing && warn && (
                   <div className="border-t border-[var(--copper)]/30 bg-[var(--copper)]/10 px-4 py-2 text-xs leading-relaxed text-[var(--text)]">

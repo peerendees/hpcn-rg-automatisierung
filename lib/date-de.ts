@@ -1,3 +1,10 @@
+/** Date → TT.MM.JJJJ (z. B. für „Lieferungs- und Leistungsdatum"). */
+export function formatDeDateLong(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}.${mm}.${d.getFullYear()}`;
+}
+
 /** DD.MM.YY oder DD.MM.YYYY → Date (lokal, Mittag wegen DST). */
 export function parseGermanDateStr(s: string): Date | null {
   const t = s.trim();

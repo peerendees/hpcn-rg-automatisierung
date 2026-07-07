@@ -14,8 +14,10 @@ export default function Home() {
               RECHNUNGSAUTOMATISIERUNG
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--muted)]">
-              CSV aus der Zeiterfassung einlesen, Positionen und Summen prüfen,
-              Rechnung als DOCX oder PDF exportieren — Prototyp hpcn.
+              Bis zu zwei CSV-Dateien aus der Zeiterfassung einlesen, Positionen
+              und Summen prüfen, Rechnung als DOCX oder PDF exportieren — danach
+              per „Weitere Rechnungen“ direkt den nächsten Durchlauf starten
+              (Rechnungsnummer +1, Rechnungsdatum bleibt) — Prototyp hpcn.
             </p>
           </div>
         </div>

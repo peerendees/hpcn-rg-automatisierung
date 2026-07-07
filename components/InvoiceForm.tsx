@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { OutputFormat } from "@/types/invoice";
 import { invoiceTemplate } from "@/lib/invoice-template";
+import { formatDeDecimal } from "@/lib/format-de";
 import {
   CsvUploader,
   type ParsedFileResult,
@@ -23,8 +24,17 @@ function suggestNextInvoiceNumber(previous: string | null): string {
   const last = digits[digits.length - 1]!;
   const n = parseInt(last, 10);
   if (Number.isNaN(n)) return previous;
-  const next = String(n + 1);
-  return previous.slice(0, previous.lastIndexOf(last)) + next;
+  const next = String(n + 1).padStart(last.length, "0");
+  const idx = previous.lastIndexOf(last);
+  return previous.slice(0, idx) + next + previous.slice(idx + last.length);
+}
+
+/** Heutiges Datum als YYYY-MM-DD in lokaler Zeitzone (nicht UTC). */
+function todayLocalYmd(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 function newLineId(fi: number, ri: number): string {
@@ -37,9 +47,8 @@ function newLineId(fi: number, ri: number): string {
 export function InvoiceForm() {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  /** Leer auf dem Server; wird beim Mount clientseitig mit lokalem Datum gefüllt. */
+  const [invoiceDate, setInvoiceDate] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("docx");
   const [parsedFiles, setParsedFiles] = useState<ParsedFileResult[]>([]);
@@ -55,11 +64,13 @@ export function InvoiceForm() {
   const [approveError, setApproveError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [lastGeneratedOk, setLastGeneratedOk] = useState(false);
 
   const globalRateRef = useRef(globalRate);
   globalRateRef.current = globalRate;
 
   useEffect(() => {
+    setInvoiceDate(todayLocalYmd());
     try {
       const prev = localStorage.getItem(STORAGE_KEY);
       const suggestion = suggestNextInvoiceNumber(prev);
@@ -121,6 +132,7 @@ export function InvoiceForm() {
         overrideHoursText: "",
         activityLabel: r.activityLabel,
         rate,
+        rateText: formatDeDecimal(rate, 2),
         rateUserOverride: false,
         kw: r.kw,
         year: r.year,
@@ -133,13 +145,16 @@ export function InvoiceForm() {
   useEffect(() => {
     setApprovalToken(null);
     setApproveError(null);
+    setLastGeneratedOk(false);
   }, [lines, includeKwDateBlock, invoiceNumber, projectTitle, invoiceDate]);
 
   const handleGlobalRateChange = useCallback((next: number) => {
     setGlobalRate(next);
     setLines((prev) =>
       prev.map((l) =>
-        l.rateUserOverride ? l : { ...l, rate: next },
+        l.rateUserOverride
+          ? l
+          : { ...l, rate: next, rateText: formatDeDecimal(next, 2) },
       ),
     );
   }, []);
@@ -243,6 +258,7 @@ export function InvoiceForm() {
       } catch {
         /* ignore */
       }
+      setLastGeneratedOk(true);
     } catch (e) {
       setGenError(e instanceof Error ? e.message : "Export fehlgeschlagen");
     } finally {
@@ -257,6 +273,30 @@ export function InvoiceForm() {
     outputFormat,
     approvalToken,
   ]);
+
+  /**
+   * „Weitere Rechnungen": Rechnungsnummer +1, Rechnungsdatum bleibt,
+   * alle übrigen Daten werden für den nächsten Durchlauf geleert.
+   */
+  const handleNextInvoice = useCallback(() => {
+    const current = invoiceNumber.trim();
+    const next = suggestNextInvoiceNumber(current);
+    if (next) setInvoiceNumber(next);
+    setProjectTitle("");
+    setFiles([]);
+    setParsedFiles([]);
+    setLines([]);
+    setIncludeKwDateBlock(false);
+    setGlobalRate(invoiceTemplate.prototypeHourlyRate);
+    setApprovalToken(null);
+    setApproveError(null);
+    setParseError(null);
+    setGenError(null);
+    setLastGeneratedOk(false);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [invoiceNumber]);
 
   const draftDisabled = parsing || files.length === 0;
 
@@ -399,6 +439,24 @@ export function InvoiceForm() {
         >
           {generating ? "Wird erzeugt …" : "Rechnung erzeugen und herunterladen"}
         </button>
+
+        {lastGeneratedOk && (
+          <div className="mt-6 rounded-xl border border-[var(--gold)]/40 bg-[var(--gold)]/5 p-4">
+            <p className="text-sm text-[var(--text)]">
+              Rechnung wurde erzeugt. Für die nächste Rechnung wird die
+              Rechnungsnummer um 1 erhöht, das Rechnungsdatum bleibt — alle
+              übrigen Daten werden geleert, damit zwei neue CSV-Dateien
+              hochgeladen werden können.
+            </p>
+            <button
+              type="button"
+              onClick={handleNextInvoice}
+              className="mt-3 rounded-lg border border-[var(--gold)] bg-[var(--gold)]/10 px-5 py-2.5 font-[family-name:var(--font-display)] text-sm tracking-wider text-[var(--gold)] transition hover:bg-[var(--gold)]/25"
+            >
+              Weitere Rechnungen
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );
