@@ -302,7 +302,7 @@ export function InvoiceForm() {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
+      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
         <h2 className="font-[family-name:var(--font-display)] text-xl tracking-[0.08em] text-[var(--gold)]">
           RECHNUNGSDATEN
         </h2>
@@ -346,7 +346,7 @@ export function InvoiceForm() {
         </label>
       </section>
 
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
+      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
         <h2 className="font-[family-name:var(--font-display)] text-xl tracking-[0.08em] text-[var(--gold)]">
           ZEITNACHWEISE
         </h2>
@@ -412,7 +412,7 @@ export function InvoiceForm() {
         </section>
       )}
 
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
+      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-[var(--border)] bg-[var(--card)]/80 p-6 shadow-lg shadow-black/20 backdrop-blur-sm">
         <h2 className="font-[family-name:var(--font-display)] text-xl tracking-[0.08em] text-[var(--gold)]">
           AUSGABE
         </h2>

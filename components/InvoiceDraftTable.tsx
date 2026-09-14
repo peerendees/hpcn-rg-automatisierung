@@ -1,6 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type TextareaHTMLAttributes,
+} from "react";
 import type { DraftInvoiceLineWire, InvoicePosition } from "@/types/invoice";
 import { invoiceTemplate } from "@/lib/invoice-template";
 import {
@@ -11,6 +16,33 @@ import {
 import { formatDeCurrency, formatDeDecimal } from "@/lib/format-de";
 import { parseDeDecimal } from "@/lib/parse-de-number";
 import { deliveryDateLine } from "@/lib/invoice-spec";
+
+/** Textfeld wächst mit dem Inhalt — Tätigkeitstexte bleiben ohne inneres Scrollen vollständig sichtbar. */
+function AutoGrowTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.height = "auto";
+      // scrollHeight ohne Rahmen; Differenz offset/client ergänzt ihn
+      el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+    };
+    fit();
+    // Andere Breite (Fenster, Spalte) ändert den Umbruch — nur darauf reagieren, nicht auf die eigene Höhe
+    let lastWidth = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === lastWidth) return;
+      lastWidth = el.clientWidth;
+      fit();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [props.value]);
+
+  return <textarea ref={ref} {...props} />;
+}
 
 export type ClientDraftLine = Omit<DraftInvoiceLineWire, "overrideHoursText"> & {
   id: string;
@@ -125,25 +157,26 @@ export function InvoiceDraftTable({
         <table className="w-full min-w-[960px] border-collapse text-left text-sm text-[var(--text)]">
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--card)]/60 text-[var(--gold)]">
-              <th className="p-2 font-mono text-xs font-normal uppercase tracking-wide">
+              <th className="whitespace-nowrap p-2 font-mono text-xs font-normal uppercase tracking-wide">
                 Pos
               </th>
-              <th className="p-2 font-mono text-xs font-normal uppercase tracking-wide">
+              <th className="whitespace-nowrap p-2 font-mono text-xs font-normal uppercase tracking-wide">
                 Std. import
               </th>
-              <th className="p-2 font-mono text-xs font-normal uppercase tracking-wide">
+              <th className="whitespace-nowrap p-2 font-mono text-xs font-normal uppercase tracking-wide">
                 Std. effektiv
               </th>
-              <th className="p-2 font-mono text-xs font-normal uppercase tracking-wide">
+              <th className="whitespace-nowrap p-2 font-mono text-xs font-normal uppercase tracking-wide">
                 LE
               </th>
-              <th className="p-2 font-mono text-xs font-normal uppercase tracking-wide">
+              {/* w-full: Tätigkeit bekommt die Restbreite, Zahlenspalten bleiben inhaltsbreit */}
+              <th className="w-full whitespace-nowrap p-2 font-mono text-xs font-normal uppercase tracking-wide">
                 Spezifikation (Tätigkeit)
               </th>
-              <th className="p-2 font-mono text-xs font-normal uppercase tracking-wide">
+              <th className="whitespace-nowrap p-2 font-mono text-xs font-normal uppercase tracking-wide">
                 EP €
               </th>
-              <th className="p-2 font-mono text-xs font-normal uppercase tracking-wide">
+              <th className="whitespace-nowrap p-2 font-mono text-xs font-normal uppercase tracking-wide">
                 GP € nt.
               </th>
             </tr>
@@ -191,14 +224,14 @@ export function InvoiceDraftTable({
                         {deliveryDateLine(line.dates)}
                       </p>
                     )}
-                    <textarea
+                    <AutoGrowTextarea
                       disabled={disabled}
                       rows={2}
                       value={line.activityLabel}
                       onChange={(e) =>
                         patchLine(i, { activityLabel: e.target.value })
                       }
-                      className="min-h-[2.5rem] w-full min-w-[220px] resize-y rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-xs leading-snug text-[var(--text)] outline-none focus:border-[var(--copper)] focus:ring-1 focus:ring-[var(--copper)]/40"
+                      className="min-h-[2.5rem] w-full min-w-[220px] resize-none overflow-hidden rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-xs leading-snug text-[var(--text)] outline-none focus:border-[var(--copper)] focus:ring-1 focus:ring-[var(--copper)]/40"
                     />
                   </td>
                   <td className="p-2 align-top">
@@ -227,7 +260,7 @@ export function InvoiceDraftTable({
                       className="w-24 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono text-xs tabular-nums outline-none focus:border-[var(--copper)] focus:ring-1 focus:ring-[var(--copper)]/40"
                     />
                   </td>
-                  <td className="p-2 align-top tabular-nums">
+                  <td className="whitespace-nowrap p-2 align-top tabular-nums">
                     {formatDeCurrency(gp)}
                   </td>
                 </tr>

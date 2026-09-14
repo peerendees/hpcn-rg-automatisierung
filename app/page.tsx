@@ -23,7 +23,8 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col pb-16">
+      {/* max-w-7xl wie SiteNav: Positionen nutzen die volle Breite, übrige Abschnitte begrenzen sich selbst */}
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col pb-16">
         <InvoiceForm />
       </main>
 
